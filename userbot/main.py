@@ -26,20 +26,28 @@ class UserBot(Client):
                 print(f"❌ Sessions dizini oluşturulamadı: {str(e)}")
                 sys.exit(1)
         
-        # Session dosyası yolu
-        self.session_file = os.path.join(self.sessions_dir, "userbot")
+        # Session string'i kullan (varsa)
+        session_string = os.getenv("SESSION_STRING")
         
-        # Modül dizini yolu
-        modules_path = os.path.join("userbot", "modules")
-        
-        # Pyrogram istemcisini başlat
-        super().__init__(
-            name=self.session_file,
-            api_id=Config.API_ID,
-            api_hash=Config.API_HASH,
-            plugins=dict(root=modules_path),
-            workdir=self.sessions_dir
-        )
+        if session_string:
+            # Session string varsa onu kullan
+            super().__init__(
+                name=":memory:",
+                api_id=Config.API_ID,
+                api_hash=Config.API_HASH,
+                session_string=session_string,
+                plugins=dict(root="userbot/modules")
+            )
+        else:
+            # Session string yoksa normal şekilde başlat
+            self.session_file = os.path.join(self.sessions_dir, "userbot")
+            super().__init__(
+                name=self.session_file,
+                api_id=Config.API_ID,
+                api_hash=Config.API_HASH,
+                plugins=dict(root="userbot/modules"),
+                workdir=self.sessions_dir
+            )
         
         self.me = None
         self.db = db
