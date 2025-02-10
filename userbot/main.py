@@ -9,24 +9,52 @@ from userbot.web_server import run_web_server
 
 async def create_session():
     """Session string oluştur"""
-    print("\n🔄 Session string oluşturuluyor...")
-    print("📱 Telegram'a bağlanılıyor...")
-    
     try:
-        async with Client(
+        phone = os.getenv("PHONE_NUMBER")
+        if not phone:
+            print("❌ PHONE_NUMBER bulunamadı!")
+            print("⚠️ Render.com'da PHONE_NUMBER değişkeni ekleyin!")
+            sys.exit(1)
+
+        print("\n🔄 Session string oluşturuluyor...")
+        print(f"📱 {phone} numarası için Telegram'a bağlanılıyor...")
+        
+        client = Client(
             "userbot",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
+            phone_number=phone,
             in_memory=True
-        ) as app:
-            session_string = await app.export_session_string()
-            print("\n✅ Session string başarıyla oluşturuldu!")
-            print("\n⚠️ BU KODU RENDER.COM'DA SESSION_STRING OLARAK EKLEYİN:")
-            print("=" * 50)
-            print(f"\n{session_string}\n")
-            print("=" * 50)
-            print("\n❗ BU KODU GÜVENLİ BİR YERE KAYDEDİN!")
-            return session_string
+        )
+        
+        await client.connect()
+        
+        if not await client.is_user_authorized():
+            code = os.getenv("LOGIN_CODE")
+            if not code:
+                sent_code = await client.send_code(phone)
+                print("\n📬 Telegram'dan gelen kodu Render.com'da LOGIN_CODE olarak ekleyin!")
+                print("⚠️ Deploy'u yeniden başlatın!")
+                sys.exit(1)
+                
+            try:
+                print("\n🔑 Kod ile giriş yapılıyor...")
+                await client.sign_in(phone, sent_code.phone_code_hash, code)
+            except Exception as e:
+                print(f"❌ Giriş hatası: {str(e)}")
+                sys.exit(1)
+        
+        session_string = await client.export_session_string()
+        await client.disconnect()
+        
+        print("\n✅ Session string başarıyla oluşturuldu!")
+        print("\n⚠️ BU KODU RENDER.COM'DA SESSION_STRING OLARAK EKLEYİN:")
+        print("=" * 50)
+        print(f"\n{session_string}\n")
+        print("=" * 50)
+        print("\n❗ Deploy'u yeniden başlatın!")
+        return session_string
+        
     except Exception as e:
         print(f"\n❌ Session string oluşturma hatası: {str(e)}")
         sys.exit(1)
@@ -34,13 +62,13 @@ async def create_session():
 class UserBot(Client):
     def __init__(self):
         # Session string'i kontrol et
-        self.session_string = os.getenv("SESSION_STRING")
-        if not self.session_string:
+        session_string = os.getenv("SESSION_STRING")
+        if not session_string:
             print("❌ SESSION_STRING bulunamadı!")
-            print("🔄 Yeni session string oluşturuluyor...")
+            print("\n🔄 Yeni session string oluşturuluyor...")
             loop = asyncio.get_event_loop()
-            self.session_string = loop.run_until_complete(create_session())
-            print("\n⚠️ Lütfen yukarıdaki session string'i Render.com'a ekleyin ve yeniden başlatın!")
+            session_string = loop.run_until_complete(create_session())
+            print("\n⚠️ Yukarıdaki session string'i Render.com'a ekleyin!")
             sys.exit(1)
             
         # Ana dizine geç
@@ -65,7 +93,7 @@ class UserBot(Client):
             name="userbot",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
-            session_string=self.session_string,
+            session_string=session_string,
             plugins=dict(root="userbot/modules")
         )
         
@@ -109,6 +137,7 @@ class UserBot(Client):
             elif "session" in error_msg:
                 print("\n❗ Session hatası!")
                 print("🔑 SESSION_STRING'i kontrol edin.")
+                print("\n⚠️ Lütfen önce yerel bilgisayarınızda setup.py çalıştırın!")
             else:
                 print(f"❌ Başlatma hatası: {str(e)}")
             sys.exit(1)
