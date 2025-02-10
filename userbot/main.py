@@ -27,34 +27,30 @@ async def create_session():
             in_memory=True
         )
         
-        await client.connect()
-        
-        if not await client.is_user_authorized():
+        async with client as app:
             code = os.getenv("LOGIN_CODE")
             if not code:
-                sent_code = await client.send_code(phone)
+                sent_code = await app.send_code(phone)
                 print("\n📬 Telegram'dan gelen kodu Render.com'da LOGIN_CODE olarak ekleyin!")
                 print("⚠️ Deploy'u yeniden başlatın!")
                 sys.exit(1)
                 
             try:
                 print("\n🔑 Kod ile giriş yapılıyor...")
-                await client.sign_in(phone, sent_code.phone_code_hash, code)
+                await app.sign_in(phone, code)
             except Exception as e:
                 print(f"❌ Giriş hatası: {str(e)}")
                 sys.exit(1)
-        
-        session_string = await client.export_session_string()
-        await client.disconnect()
-        
-        print("\n✅ Session string başarıyla oluşturuldu!")
-        print("\n⚠️ BU KODU RENDER.COM'DA SESSION_STRING OLARAK EKLEYİN:")
-        print("=" * 50)
-        print(f"\n{session_string}\n")
-        print("=" * 50)
-        print("\n❗ Deploy'u yeniden başlatın!")
-        return session_string
-        
+            
+            session_string = await app.export_session_string()
+            print("\n✅ Session string başarıyla oluşturuldu!")
+            print("\n⚠️ BU KODU RENDER.COM'DA SESSION_STRING OLARAK EKLEYİN:")
+            print("=" * 50)
+            print(f"\n{session_string}\n")
+            print("=" * 50)
+            print("\n❗ Deploy'u yeniden başlatın!")
+            return session_string
+            
     except Exception as e:
         print(f"\n❌ Session string oluşturma hatası: {str(e)}")
         sys.exit(1)
