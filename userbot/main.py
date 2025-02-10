@@ -7,8 +7,42 @@ from userbot.config.config import Config
 from userbot.config.database import db
 from userbot.web_server import run_web_server
 
+async def create_session():
+    """Session string oluştur"""
+    print("\n🔄 Session string oluşturuluyor...")
+    print("📱 Telegram'a bağlanılıyor...")
+    
+    try:
+        async with Client(
+            "userbot",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            in_memory=True
+        ) as app:
+            session_string = await app.export_session_string()
+            print("\n✅ Session string başarıyla oluşturuldu!")
+            print("\n⚠️ BU KODU RENDER.COM'DA SESSION_STRING OLARAK EKLEYİN:")
+            print("=" * 50)
+            print(f"\n{session_string}\n")
+            print("=" * 50)
+            print("\n❗ BU KODU GÜVENLİ BİR YERE KAYDEDİN!")
+            return session_string
+    except Exception as e:
+        print(f"\n❌ Session string oluşturma hatası: {str(e)}")
+        sys.exit(1)
+
 class UserBot(Client):
     def __init__(self):
+        # Session string'i kontrol et
+        self.session_string = os.getenv("SESSION_STRING")
+        if not self.session_string:
+            print("❌ SESSION_STRING bulunamadı!")
+            print("🔄 Yeni session string oluşturuluyor...")
+            loop = asyncio.get_event_loop()
+            self.session_string = loop.run_until_complete(create_session())
+            print("\n⚠️ Lütfen yukarıdaki session string'i Render.com'a ekleyin ve yeniden başlatın!")
+            sys.exit(1)
+            
         # Ana dizine geç
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         os.chdir(self.base_dir)
@@ -26,28 +60,14 @@ class UserBot(Client):
                 print(f"❌ Sessions dizini oluşturulamadı: {str(e)}")
                 sys.exit(1)
         
-        # Session string'i kullan (varsa)
-        session_string = os.getenv("SESSION_STRING")
-        
-        if session_string:
-            # Session string varsa onu kullan
-            super().__init__(
-                name=":memory:",
-                api_id=Config.API_ID,
-                api_hash=Config.API_HASH,
-                session_string=session_string,
-                plugins=dict(root="userbot/modules")
-            )
-        else:
-            # Session string yoksa normal şekilde başlat
-            self.session_file = os.path.join(self.sessions_dir, "userbot")
-            super().__init__(
-                name=self.session_file,
-                api_id=Config.API_ID,
-                api_hash=Config.API_HASH,
-                plugins=dict(root="userbot/modules"),
-                workdir=self.sessions_dir
-            )
+        # Pyrogram istemcisini başlat
+        super().__init__(
+            name="userbot",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            session_string=self.session_string,
+            plugins=dict(root="userbot/modules")
+        )
         
         self.me = None
         self.db = db
@@ -61,7 +81,7 @@ class UserBot(Client):
             self.web_thread.daemon = True
             self.web_thread.start()
             
-            # MongoDB'ye bağlan (başarısız olursa yerel DB kullanılır)
+            # MongoDB'ye bağlan
             await self.db.connect()
             
             # Telegram'a bağlan
@@ -69,7 +89,7 @@ class UserBot(Client):
             await super().start()
             self.me = await self.get_me()
             
-            # Kullanıcı bilgilerini kaydet/güncelle
+            # Kullanıcı bilgilerini kaydet
             await self.db.save_user({
                 "user_id": self.me.id,
                 "username": self.me.username,
@@ -85,24 +105,13 @@ class UserBot(Client):
             error_msg = str(e).lower()
             if "api_id" in error_msg:
                 print("\n❗ API bilgileri eksik veya hatalı!")
-                print("🔑 Lütfen setup.py dosyasını çalıştırarak API bilgilerini girin.")
-            elif "database" in error_msg:
-                print("\n❗ Session dosyası oluşturulamadı!")
-                print("🔄 Sessions dizininin yazma izinlerini kontrol edin.")
-                # Session dosyasını silmeyi dene
-                try:
-                    if os.path.exists(f"{self.session_file}.session"):
-                        os.remove(f"{self.session_file}.session")
-                        print("🔄 Eski session dosyası silindi. Lütfen tekrar deneyin.")
-                except:
-                    pass
-            elif "no module" in error_msg:
-                print("\n❗ Modül yolu hatası!")
-                print("🔄 Lütfen doğru dizinde olduğunuzdan emin olun.")
-                print(f"📂 Çalışma dizini: {os.getcwd()}")
+                print("🔑 API_ID ve API_HASH'i kontrol edin.")
+            elif "session" in error_msg:
+                print("\n❗ Session hatası!")
+                print("🔑 SESSION_STRING'i kontrol edin.")
             else:
                 print(f"❌ Başlatma hatası: {str(e)}")
-            raise e
+            sys.exit(1)
 
     async def stop(self):
         """Bot ve veritabanı bağlantılarını kapat"""
@@ -117,10 +126,10 @@ def main():
     """Ana fonksiyon"""
     try:
         if not Config.validate():
-            print("❌ Lütfen önce setup.py dosyasını çalıştırın!")
-            print("🔑 API bilgilerini girmeniz gerekiyor.")
+            print("❌ API bilgileri eksik!")
+            print("🔑 API_ID ve API_HASH'i environment variables'a ekleyin.")
             return
-        
+            
         # Eski session dosyasını temizle
         session_file = os.path.join("sessions", "userbot.session")
         if os.path.exists(session_file):
