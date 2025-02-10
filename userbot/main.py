@@ -10,7 +10,11 @@ from userbot.web_server import run_web_server
 async def create_session():
     """Session string oluştur"""
     try:
+        # Gerekli değişkenleri kontrol et
         phone = os.getenv("PHONE_NUMBER")
+        code = os.getenv("TELEGRAM_CODE")
+        phone_code_hash = os.getenv("PHONE_CODE_HASH")
+        
         if not phone:
             print("❌ PHONE_NUMBER bulunamadı!")
             print("⚠️ Render.com'da şu değişkenleri ekleyin:")
@@ -31,20 +35,24 @@ async def create_session():
         )
         
         async with client as app:
-            # Telegram'a bağlan ve kod gönder
-            sent_code = await app.send_code(phone)
-            
-            # Telegram kodunu bekle
-            print("\n📬 Telegram'dan gelen kodu aldınız mı?")
-            print("⚠️ Render.com'da TELEGRAM_CODE değişkeni ekleyin ve deploy'u yeniden başlatın!")
-            
-            code = os.getenv("TELEGRAM_CODE")
+            if not phone_code_hash:
+                # İlk kez bağlanıyoruz, kod isteyelim
+                sent = await app.send_code(phone)
+                print("\n📬 Telegram'dan gelen kodu aldınız mı?")
+                print("⚠️ Render.com'da şu değişkenleri ekleyin:")
+                print(f"1. PHONE_CODE_HASH = {sent.phone_code_hash}")
+                print("2. TELEGRAM_CODE = (Telegram'dan gelen kod)")
+                print("\n❗ Deploy'u yeniden başlatın!")
+                sys.exit(1)
+                
             if not code:
+                print("❌ TELEGRAM_CODE bulunamadı!")
+                print("⚠️ Render.com'da TELEGRAM_CODE değişkenini ekleyin!")
                 sys.exit(1)
                 
             try:
                 print("\n🔑 Kod ile giriş yapılıyor...")
-                await app.sign_in(phone, code)
+                await app.sign_in(phone, phone_code_hash, code)
                 
                 # Session string'i al
                 session_string = await app.export_session_string()
@@ -54,14 +62,19 @@ async def create_session():
                 print(f"\n{session_string}\n")
                 print("=" * 50)
                 print("\n❗ Deploy'u yeniden başlatın!")
+                
+                # Artık bu değişkenlere ihtiyacımız yok
+                print("\n🔄 Eski değişkenleri temizleyin:")
+                print("1. TELEGRAM_CODE değişkenini silin")
+                print("2. PHONE_CODE_HASH değişkenini silin")
                 return session_string
                 
             except Exception as e:
                 print(f"❌ Giriş hatası: {str(e)}")
                 print("\n⚠️ Muhtemelen kod hatalı veya süresi dolmuş.")
-                print("1. Render.com'da TELEGRAM_CODE değişkenini silin")
+                print("1. TELEGRAM_CODE ve PHONE_CODE_HASH değişkenlerini silin")
                 print("2. Deploy'u yeniden başlatın")
-                print("3. Yeni gelen kodu TELEGRAM_CODE olarak ekleyin")
+                print("3. Yeni değişkenleri ekleyin")
                 sys.exit(1)
             
     except Exception as e:
