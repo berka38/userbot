@@ -2,10 +2,14 @@ from aiohttp import web
 import asyncio
 from datetime import datetime
 import json
+import os
 
 # Global değişkenler
 START_TIME = datetime.now()
 bot_status = {"is_running": True}
+
+# Port ayarı
+PORT = int(os.getenv("PORT", 10000))
 
 async def handle_home(request):
     """Ana sayfa"""
@@ -30,12 +34,14 @@ async def start_web_server():
     
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
     
-    print(f"✅ Web sunucusu başlatıldı: http://localhost:8080")
+    print(f"✅ Web sunucusu başlatıldı: http://0.0.0.0:{PORT}")
     
-    return runner, site
+    # Sonsuz döngü ile sunucuyu açık tut
+    while True:
+        await asyncio.sleep(3600)  # Her saat kontrol et
 
 def run_web_server():
     """Web sunucusunu arka planda çalıştır"""

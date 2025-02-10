@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: userbot
     env: python
     buildCommand: pip install -r requirements.txt
@@ -9,4 +9,8 @@ services:
       - key: API_ID
         sync: false
       - key: API_HASH
-        sync: false 
+        sync: false
+      - key: SESSION_STRING
+        sync: false
+      - key: PORT
+        value: 10000 
