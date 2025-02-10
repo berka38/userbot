@@ -3,9 +3,9 @@ import sys
 import asyncio
 import threading
 from pyrogram import Client
-from config.config import Config
-from config.database import db
-from web_server import run_web_server
+from userbot.config.config import Config
+from userbot.config.database import db
+from userbot.web_server import run_web_server
 
 class UserBot(Client):
     def __init__(self):
