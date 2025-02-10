@@ -26,7 +26,8 @@ async def create_session():
         print("\n🔄 Session string oluşturuluyor...")
         print(f"📱 {phone} numarası için Telegram'a bağlanılıyor...")
         
-        client = Client(
+        # Pyrogram istemcisini oluştur
+        app = Client(
             "userbot",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
@@ -34,7 +35,10 @@ async def create_session():
             in_memory=True
         )
         
-        async with client as app:
+        # Telegram'a bağlan
+        await app.connect()
+        
+        try:
             if not phone_code_hash:
                 # İlk kez bağlanıyoruz, kod isteyelim
                 sent = await app.send_code(phone)
@@ -43,16 +47,24 @@ async def create_session():
                 print(f"1. PHONE_CODE_HASH = {sent.phone_code_hash}")
                 print("2. TELEGRAM_CODE = (Telegram'dan gelen kod)")
                 print("\n❗ Deploy'u yeniden başlatın!")
+                await app.disconnect()
                 sys.exit(1)
                 
             if not code:
                 print("❌ TELEGRAM_CODE bulunamadı!")
                 print("⚠️ Render.com'da TELEGRAM_CODE değişkenini ekleyin!")
+                await app.disconnect()
                 sys.exit(1)
                 
             try:
                 print("\n🔑 Kod ile giriş yapılıyor...")
-                await app.sign_in(phone, phone_code_hash, code)
+                # Manuel olarak sign in işlemini gerçekleştir
+                signed = await app.sign_in(phone, phone_code_hash, code)
+                
+                if not signed:
+                    print("❌ Giriş başarısız!")
+                    await app.disconnect()
+                    sys.exit(1)
                 
                 # Session string'i al
                 session_string = await app.export_session_string()
@@ -67,6 +79,8 @@ async def create_session():
                 print("\n🔄 Eski değişkenleri temizleyin:")
                 print("1. TELEGRAM_CODE değişkenini silin")
                 print("2. PHONE_CODE_HASH değişkenini silin")
+                
+                await app.disconnect()
                 return session_string
                 
             except Exception as e:
@@ -75,10 +89,22 @@ async def create_session():
                 print("1. TELEGRAM_CODE ve PHONE_CODE_HASH değişkenlerini silin")
                 print("2. Deploy'u yeniden başlatın")
                 print("3. Yeni değişkenleri ekleyin")
+                await app.disconnect()
                 sys.exit(1)
+            
+        except Exception as e:
+            print(f"❌ Giriş hatası: {str(e)}")
+            print("\n⚠️ Muhtemelen kod hatalı veya süresi dolmuş.")
+            print("1. TELEGRAM_CODE ve PHONE_CODE_HASH değişkenlerini silin")
+            print("2. Deploy'u yeniden başlatın")
+            print("3. Yeni değişkenleri ekleyin")
+            await app.disconnect()
+            sys.exit(1)
             
     except Exception as e:
         print(f"\n❌ Session string oluşturma hatası: {str(e)}")
+        if 'app' in locals():
+            await app.disconnect()
         sys.exit(1)
 
 class UserBot(Client):
